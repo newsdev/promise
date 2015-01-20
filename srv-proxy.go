@@ -54,7 +54,7 @@ func main() {
 			host := req.Host
 			for _, domain := range domainsParsed {
 				if base := strings.TrimSuffix(host, domain); base != host {
-					host := fmt.Sprintf("%s%s", base, target)
+					host = fmt.Sprintf("%s%s", base, target)
 					break
 				}
 			}
