@@ -80,5 +80,12 @@ func main() {
 		},
 	}
 
-	log.Fatal(http.ListenAndServe(address, reverseProxy))
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		fmt.Fprint(w, "ok")
+	})
+
+	http.Handle("/", reverseProxy)
+
+	log.Fatal(http.ListenAndServe(address, nil))
 }
