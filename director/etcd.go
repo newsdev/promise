@@ -43,7 +43,7 @@ type etcdDirector struct {
 }
 
 func NewEtcdDirector(machines []string) *etcdDirector {
-	b := &etcdDirector{
+	return &etcdDirector{
 		client: etcd.NewClient(machines),
 		groups: make(map[string]*group),
 	}
