@@ -48,6 +48,13 @@ func main() {
 
 	// Create a new director.
 	d := director.NewEtcdDirector(strings.Split(etcdPeers, ","))
+	go func() {
+		for {
+			if err := d.Watch(); err != nil {
+				log.Println(err)
+			}
+		}
+	}()
 
 	// Build a custom ReverseProxy object.
 	reverseProxy := &httputil.ReverseProxy{
