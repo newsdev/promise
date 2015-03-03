@@ -78,15 +78,15 @@ func (b *etcdDirector) group(name string) *group {
 
 func (b *etcdDirector) reset() (uint64, error) {
 
+	// Get the lock for writing.
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	// Get(key string, sort, recursive bool)
 	r, err := b.client.Get(etcdRoot, true, true)
 	if err != nil {
 		return 0, err
 	}
-
-	// Get the lock for writing.
-	b.lock.Lock()
-	defer b.lock.Unlock()
 
 	// Clear all of the existing groups.
 	log.WithFields(log.Fields{"etcd_index": r.EtcdIndex}).Info("reset")
@@ -160,6 +160,11 @@ func (b *etcdDirector) watch(index uint64) error {
 
 func (b *etcdDirector) Watch() error {
 	for {
+
+		// Sync the cluster.
+		if !b.client.SyncCluster() {
+			log.Warn("cluster sync failed")
+		}
 
 		// Get the current etcd index value and reset the groups.
 		if index, err := b.reset(); err != nil {
