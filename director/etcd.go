@@ -3,11 +3,12 @@ package director
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync"
+	"time"
 
+	log "github.com/nytinteractive/srv-proxy/vendor/src/github.com/Sirupsen/logrus"
 	"github.com/nytinteractive/srv-proxy/vendor/src/github.com/coreos/go-etcd/etcd"
 )
 
@@ -15,7 +16,7 @@ const (
 	etcdRoot = "/proxy/"
 )
 
-func parseNode(node *etcd.Node) (hostname, backend, value string, err error) {
+func parseNode(node *etcd.Node) (hostname, backend, value string, fields log.Fields, err error) {
 
 	// Check if the node is a directory.
 	if node.Dir {
@@ -33,6 +34,11 @@ func parseNode(node *etcd.Node) (hostname, backend, value string, err error) {
 	hostname = keyComponents[0]
 	backend = keyComponents[1]
 	value = node.Value
+	fields = log.Fields{
+		"hostname": hostname,
+		"backend":  backend,
+		"value":    value,
+	}
 	return
 }
 
@@ -70,18 +76,20 @@ func (b *etcdDirector) group(name string) *group {
 	return b.groups[name]
 }
 
-func (b *etcdDirector) Watch() error {
+func (b *etcdDirector) reset() (uint64, error) {
 
 	// Get(key string, sort, recursive bool)
 	r, err := b.client.Get(etcdRoot, true, true)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Get the lock for writing.
 	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	// Clear all of the existing groups.
+	log.WithFields(log.Fields{"etcd_index": r.EtcdIndex}).Info("reset")
 	b.groups = make(map[string]*group)
 
 	for _, hostNode := range r.Node.Nodes {
@@ -89,31 +97,34 @@ func (b *etcdDirector) Watch() error {
 
 			// Break appart the key to get the hostname, backend name, and address
 			// value.
-			hostname, backend, value, err := parseNode(backendNode)
+			hostname, backend, value, fields, err := parseNode(backendNode)
+			log.WithFields(fields).Info("+ backend")
 			if err != nil {
-				log.Println(err)
+				log.WithFields(fields).Warn(err)
 				continue
 			}
 
 			if err := b.group(hostname).set(backend, value); err != nil {
-				log.Println(err)
+				log.WithFields(fields).Warn(err)
 			}
 		}
 	}
 
-	// Unlock the lock.
-	b.lock.Unlock()
+	return r.EtcdIndex, nil
+}
 
-	// Set the initial index.
-	waitIndex := r.EtcdIndex + 1
+func (b *etcdDirector) watch(index uint64) error {
+
+	waitIndex := index + 1
 	for {
 
 		// Issue the watch command. This will block until a new update is
 		// available.
+
+		log.WithFields(log.Fields{"wait_index": waitIndex}).Info("watch")
 		w, err := b.client.Watch(etcdRoot, waitIndex, true, nil, nil)
 		if err != nil {
-			fmt.Println(err)
-			continue
+			return err
 		}
 
 		// Update the wait index to insure we don't miss any updates.
@@ -121,28 +132,49 @@ func (b *etcdDirector) Watch() error {
 
 		// Break appart the key to get the hostname, backend name, and address
 		// value.
-		hostname, backend, value, err := parseNode(w.Node)
+		hostname, backend, value, fields, err := parseNode(w.Node)
 		if err != nil {
-			fmt.Println(err)
+			log.WithFields(fields).Warn(err)
 			continue
 		}
 
 		// Get the lock for writing.
 		b.lock.Lock()
 
+		log.WithFields(log.Fields{"etcd_index": w.EtcdIndex}).Info("watch return")
 		switch w.Action {
 		case "set":
+			log.WithFields(fields).Info("+ backend")
 			if err := b.group(hostname).set(backend, value); err != nil {
-				log.Println(err)
+				log.WithFields(fields).Warn(err)
 			}
 		case "delete", "expire":
+			log.WithFields(fields).Info("- backend")
 			b.group(hostname).delete(backend)
 		}
 
 		// Unlock the lock.
 		b.lock.Unlock()
 	}
+}
 
+func (b *etcdDirector) Watch() error {
+	for {
+
+		// Get the current etcd index value and reset the groups.
+		if index, err := b.reset(); err != nil {
+			log.Error(err)
+
+			// Sleep in order to not slam etcd with connection attempts.
+			time.Sleep(time.Duration(5) * time.Second)
+		} else {
+
+			// Wait for updates.
+			if err := b.watch(index); err != nil {
+				log.Error(err)
+			}
+		}
+	}
 	return nil
 }
 

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nytinteractive/srv-proxy/director"
+	log "github.com/nytinteractive/srv-proxy/vendor/src/github.com/Sirupsen/logrus"
 )
 
 var (

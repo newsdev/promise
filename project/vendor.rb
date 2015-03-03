@@ -33,3 +33,6 @@ def package(type, name, ref)
 end
 
 package :git, 'github.com/coreos/go-etcd', '6aa2da5a7a905609c93036b9307185a04a5a84a5'
+
+# logrus v0.6.5
+package :git, 'github.com/Sirupsen/logrus', 'c0f7e35ed2e48f188c37581b4b743cf7383f85c6'
