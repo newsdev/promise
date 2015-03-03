@@ -2,6 +2,7 @@ package director
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 )
@@ -31,6 +32,11 @@ func (g *group) set(name, addr string) error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		return err
+	}
+
+	// Check that a valid port was provided.
+	if tcpAddr.Port <= 0 {
+		return errors.New(fmt.Sprintf("invalid port %d", tcpAddr.Port))
 	}
 
 	g.ref[name] = tcpAddr
