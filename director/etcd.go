@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/coreos/go-etcd/etcd"
+	"github.com/nytinteractive/srv-proxy/vendor/src/github.com/coreos/go-etcd/etcd"
 )
 
 const (
@@ -45,7 +45,6 @@ type etcdDirector struct {
 func NewEtcdDirector(machines []string) *etcdDirector {
 	return &etcdDirector{
 		client: etcd.NewClient(machines),
-		groups: make(map[string]*group),
 	}
 }
 
@@ -81,6 +80,9 @@ func (b *etcdDirector) Watch() error {
 
 	// Get the lock for writing.
 	b.lock.Lock()
+
+	// Clear all of the existing groups.
+	b.groups = make(map[string]*group)
 
 	for _, hostNode := range r.Node.Nodes {
 		for _, backendNode := range hostNode.Nodes {
