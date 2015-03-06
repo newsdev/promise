@@ -42,7 +42,7 @@ func main() {
 			// do not know about, but it's a less than ideal solution.
 			addr, err := d.Pick(req.Host, req.URL.Path)
 			if err != nil {
-				log.Println(err)
+				log.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path}).Error(err)
 				return
 			}
 
