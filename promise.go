@@ -7,8 +7,8 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"github.com/nytinteractive/srv-proxy/director"
-	log "github.com/nytinteractive/srv-proxy/vendor/src/github.com/Sirupsen/logrus"
+	"github.com/newsdev/promise/director"
+	log "github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
 )
 
 var (

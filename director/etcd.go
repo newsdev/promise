@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/nytinteractive/srv-proxy/vendor/src/github.com/Sirupsen/logrus"
-	"github.com/nytinteractive/srv-proxy/vendor/src/github.com/coreos/go-etcd/etcd"
+	log "github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
+	"github.com/newsdev/promise/vendor/src/github.com/coreos/go-etcd/etcd"
 )
 
 const (
@@ -141,22 +141,24 @@ func (b *etcdDirector) nodeAction(action string, node *etcd.Node) {
 
 func (b *etcdDirector) reset() (uint64, error) {
 
-	// Get the lock for writing.
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	// Clear current domain and service values.
-	b.domains = make(map[string]*domain)
-	b.services = make(map[string]*service)
-
 	// Get(key string, sort, recursive bool)
 	r, err := b.client.Get(etcdRootKey, true, true)
 	if err != nil {
 		return 0, err
 	}
 
+	// Get the lock for writing.
+	b.lock.Lock()
+
+	// Clear current domain and service values.
+	b.domains = make(map[string]*domain)
+	b.services = make(map[string]*service)
+
 	// Process the node action while holding the lock.
 	b.nodeAction(r.Action, r.Node)
+
+	// Release the lock.
+	b.lock.Unlock()
 
 	// Return the etcd index.
 	return r.EtcdIndex, nil
