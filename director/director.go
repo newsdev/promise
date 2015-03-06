@@ -5,5 +5,5 @@ import (
 )
 
 type Director interface {
-	Pick(hostname string) (*net.TCPAddr, error)
+	Pick(hostname, path string) (*net.TCPAddr, error)
 }
