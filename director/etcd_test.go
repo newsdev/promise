@@ -1,15 +1,15 @@
 package director
 
-import (
-	"testing"
-)
+// import (
+// 	"testing"
+// )
 
-func TestEtcdDirector(t *testing.T) {
+// func TestEtcdDirector(t *testing.T) {
 
-	b := NewEtcdDirector([]string{"http://127.0.0.1:4001"})
+// 	b := NewEtcdDirector([]string{"http://127.0.0.1:4001"})
 
-	err := b.Wait()
+// 	err := b.Wait()
 
-	t.Error(err)
+// 	t.Error(err)
 
-}
+// }

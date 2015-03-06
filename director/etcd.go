@@ -13,39 +13,18 @@ import (
 )
 
 const (
-	etcdRoot = "/proxy/"
+	etcdRootKey  = "/proxy/"
+	domainsKind  = "domains"
+	servicesKind = "services"
 )
-
-func parseNode(node *etcd.Node) (hostname, backend, value string, fields log.Fields, err error) {
-
-	// Check if the node is a directory.
-	if node.Dir {
-		err = errors.New("node is a directory")
-		return
-	}
-
-	key := strings.TrimPrefix(node.Key, etcdRoot)
-	keyComponents := strings.Split(key, "/")
-	if len(keyComponents) != 2 {
-		err = errors.New(fmt.Sprintf("node key, %s, has the wrong number of components", key))
-		return
-	}
-
-	hostname = keyComponents[0]
-	backend = keyComponents[1]
-	value = node.Value
-	fields = log.Fields{
-		"hostname": hostname,
-		"backend":  backend,
-		"value":    value,
-	}
-	return
-}
 
 type etcdDirector struct {
 	client *etcd.Client
-	groups map[string]*group
-	lock   sync.RWMutex
+
+	// Access to the routing information is controlled by a read/write mutext.
+	lock     sync.RWMutex
+	domains  map[string]*domain
+	services map[string]*service
 }
 
 func NewEtcdDirector(machines []string) *etcdDirector {
@@ -54,26 +33,110 @@ func NewEtcdDirector(machines []string) *etcdDirector {
 	}
 }
 
-func (b *etcdDirector) groupNoCreate(name string) *group {
+// getDomain will return the domain of the given name. If that domain is
+// missing, it will create a new domain, store it, and return it.
+func (b *etcdDirector) getDomain(name string) *domain {
 
 	// Check if we've seen this hostname.
-	if group, ok := b.groups[name]; ok {
-		return group
-	}
-
-	return nil
-}
-
-func (b *etcdDirector) group(name string) *group {
-
-	// Check if we've seen this hostname.
-	if group := b.groupNoCreate(name); group != nil {
-		return group
+	if d, ok := b.domains[name]; ok {
+		return d
 	}
 
 	// Create a new group and return it.
-	b.groups[name] = newGroup()
-	return b.groups[name]
+	b.domains[name] = newDomain()
+	return b.domains[name]
+}
+
+// getService will return the service of the given name. If that service
+// is missing, it will create a new service, store it, and return it.
+func (b *etcdDirector) getService(name string) *service {
+
+	// Check if we've seen this hostname.
+	if s, ok := b.services[name]; ok {
+		return s
+	}
+
+	// Create a new group and return it.
+	b.services[name] = newService()
+	return b.services[name]
+}
+
+func (b *etcdDirector) nodeAction(action string, node *etcd.Node) {
+
+	// Check if the node is a directory.
+	if node.Dir {
+
+		// Recurse to find leaves.
+		for _, next := range node.Nodes {
+			b.nodeAction(action, next)
+		}
+	} else {
+
+		// Parse the components, returning if there are the wrong number.
+		key := strings.TrimPrefix(node.Key, etcdRootKey)
+		keyComponents := strings.SplitN(key, "/", 3)
+		if len(keyComponents) != 3 {
+			log.Error(fmt.Sprintf("node key, %s, has the wrong number of components", key))
+			return
+		}
+
+		// Map the key components and set the field object.
+		kind := keyComponents[0]
+		name := keyComponents[1]
+		detail := keyComponents[2]
+		value := node.Value
+		fields := log.Fields{
+			"kind":   kind,
+			"name":   name,
+			"detail": detail,
+			"value":  value,
+		}
+
+		// Switch on the first value, kind.
+		switch kind {
+
+		// Process a domain-related action.
+		case domainsKind:
+			d := b.getDomain(name)
+			switch action {
+			case "get", "set":
+				d.setPrefix(detail, value)
+				log.WithFields(fields).Info("+ domain prefix")
+			case "delete", "expire":
+				d.removePrefix(detail)
+				log.WithFields(fields).Info("- domain prefix")
+			}
+
+		// Process a service-related action.
+		case servicesKind:
+			s := b.getService(name)
+			switch action {
+			case "get", "set":
+
+				// Parse the address.
+				addr, err := net.ResolveTCPAddr("tcp", value)
+				if err != nil {
+					log.WithFields(fields).Error(err)
+					return
+				}
+
+				if addr.Port <= 0 {
+					log.WithFields(fields).Error("invalid port")
+					return
+				}
+
+				s.setAddr(detail, addr)
+				log.WithFields(fields).Info("+ service addr")
+
+			case "delete", "expire":
+				s.removeAddr(detail)
+				log.WithFields(fields).Info("- service addr")
+			}
+
+		default:
+			log.WithFields(fields).Error("unknown kind")
+		}
+	}
 }
 
 func (b *etcdDirector) reset() (uint64, error) {
@@ -82,91 +145,60 @@ func (b *etcdDirector) reset() (uint64, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	// Clear current domain and service values.
+	b.domains = make(map[string]*domain)
+	b.services = make(map[string]*service)
+
 	// Get(key string, sort, recursive bool)
-	r, err := b.client.Get(etcdRoot, true, true)
+	r, err := b.client.Get(etcdRootKey, true, true)
 	if err != nil {
 		return 0, err
 	}
 
-	// Clear all of the existing groups.
-	log.WithFields(log.Fields{"etcd_index": r.EtcdIndex}).Info("reset")
-	b.groups = make(map[string]*group)
+	// Process the node action while holding the lock.
+	b.nodeAction(r.Action, r.Node)
 
-	for _, hostNode := range r.Node.Nodes {
-		for _, backendNode := range hostNode.Nodes {
-
-			// Break appart the key to get the hostname, backend name, and address
-			// value.
-			hostname, backend, value, fields, err := parseNode(backendNode)
-			log.WithFields(fields).Info("+ backend")
-			if err != nil {
-				log.WithFields(fields).Warn(err)
-				continue
-			}
-
-			if err := b.group(hostname).set(backend, value); err != nil {
-				log.WithFields(fields).Warn(err)
-			}
-		}
-	}
-
+	// Return the etcd index.
 	return r.EtcdIndex, nil
 }
 
 func (b *etcdDirector) watch(index uint64) error {
 
+	// Wait for the update after the current etcd index.
 	waitIndex := index + 1
 	for {
 
 		// Issue the watch command. This will block until a new update is
-		// available.
-
+		// available or an error occurs.
 		log.WithFields(log.Fields{"wait_index": waitIndex}).Info("watch")
-		w, err := b.client.Watch(etcdRoot, waitIndex, true, nil, nil)
+		r, err := b.client.Watch(etcdRootKey, waitIndex, true, nil, nil)
 		if err != nil {
 			return err
 		}
 
 		// Update the wait index to insure we don't miss any updates.
-		waitIndex = w.EtcdIndex + 1
+		waitIndex = r.EtcdIndex + 1
 
-		// Break appart the key to get the hostname, backend name, and address
-		// value.
-		hostname, backend, value, fields, err := parseNode(w.Node)
-		if err != nil {
-			log.WithFields(fields).Warn(err)
-			continue
-		}
-
-		// Get the lock for writing.
+		// Process the node action while holding the lock.
 		b.lock.Lock()
-
-		log.WithFields(log.Fields{"etcd_index": w.EtcdIndex}).Info("watch return")
-		switch w.Action {
-		case "set":
-			log.WithFields(fields).Info("+ backend")
-			if err := b.group(hostname).set(backend, value); err != nil {
-				log.WithFields(fields).Warn(err)
-			}
-		case "delete", "expire":
-			log.WithFields(fields).Info("- backend")
-			b.group(hostname).delete(backend)
-		}
-
-		// Unlock the lock.
+		b.nodeAction(r.Action, r.Node)
 		b.lock.Unlock()
 	}
 }
 
-func (b *etcdDirector) Watch() error {
+// Watch monitors etcd for any configuration updates and applies them to the
+// director. It's meant to run consistently and only log errors it encounters.
+func (b *etcdDirector) Watch() {
 	for {
 
-		// Sync the cluster.
+		// Sync the cluster. We're only issuing a warning on failure, because it's
+		// possible that we have sufficient information to read from at least one
+		// etcd instance.
 		if !b.client.SyncCluster() {
 			log.Warn("cluster sync failed")
 		}
 
-		// Get the current etcd index value and reset the groups.
+		// Try to get the current etcd index value and reset the groups.
 		if index, err := b.reset(); err != nil {
 			log.Error(err)
 
@@ -174,30 +206,37 @@ func (b *etcdDirector) Watch() error {
 			time.Sleep(time.Duration(5) * time.Second)
 		} else {
 
-			// Wait for updates.
+			// Wait for updates. In the event of an error, we go straight to another
+			// reset attempt.
 			if err := b.watch(index); err != nil {
 				log.Error(err)
 			}
 		}
 	}
-	return nil
 }
 
-func (b *etcdDirector) Pick(hostname string) (*net.TCPAddr, error) {
+// Pick attempts to match a hostname/path combination with the address of a
+// server that can handle the request.
+func (b *etcdDirector) Pick(hostname, path string) (*net.TCPAddr, error) {
 
 	// Get the lock for reading and defer it's release.
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	group := b.groupNoCreate(hostname)
-	if group == nil {
-		return nil, errors.New(fmt.Sprintf("%s: no backends available", hostname))
+	domain := b.domains[hostname]
+	if domain == nil {
+		return nil, errors.New(fmt.Sprintf("domain, %s, not defined", hostname))
 	}
 
-	pick, err := group.pick()
+	serviceName, err := domain.pick(strings.TrimPrefix(path, "/"))
 	if err != nil {
 		return nil, err
 	}
 
-	return pick, nil
+	service := b.services[serviceName]
+	if service == nil {
+		return nil, errors.New(fmt.Sprintf("service, %s, not defined", serviceName))
+	}
+
+	return service.pick()
 }
