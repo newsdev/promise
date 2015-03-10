@@ -16,12 +16,14 @@ func newDomain() *domain {
 	}
 }
 
+// setPrefix adds a prefix/service pair to the domain.
 func (d *domain) setPrefix(prefix, service string) {
 
 	// We only want to add this value to the list if we haven't seen it before.
 	if _, ok := d.pathPrefixes[prefix]; !ok {
 
-		// Save a temporary reference to the list and create a new list.
+		// Save a temporary reference to the list and create a new list that has
+		// room for another element.
 		tmpPathPrefixesList := d.pathPrefixesList
 		d.pathPrefixesList = make([]string, len(d.pathPrefixesList)+1)
 
@@ -45,6 +47,7 @@ func (d *domain) setPrefix(prefix, service string) {
 	d.pathPrefixes[prefix] = service
 }
 
+// removePrefix removes a prefix from the domain.
 func (d *domain) removePrefix(prefix string) {
 
 	// We only need to remove a prefix if it exists in the map.
