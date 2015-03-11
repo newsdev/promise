@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	etcdRootKey  = "/proxy/"
+	etcdRootKey  = "/promise/"
 	domainsKind  = "domains"
 	servicesKind = "services"
 )
