@@ -48,5 +48,6 @@ func (g *service) pick() (*net.TCPAddr, error) {
 		return g.addrsList[0], nil
 	}
 
-	return g.addrsList[atomic.AddUint32(&g.index, uint32(1))%uint32(n)], nil
+	i := atomic.AddUint32(&g.index, uint32(1)) % uint32(n)
+	return g.addrsList[i], nil
 }
