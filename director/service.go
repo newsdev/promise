@@ -2,13 +2,18 @@ package director
 
 import (
 	"errors"
-	"math/rand"
 	"net"
+	"sync/atomic"
+)
+
+var (
+	noAvailableAddrError = errors.New("no available address")
 )
 
 type service struct {
 	addrsList []*net.TCPAddr
 	addrs     map[string]*net.TCPAddr
+	index     uint32
 }
 
 func newService() *service {
@@ -38,10 +43,10 @@ func (g *service) pick() (*net.TCPAddr, error) {
 	n := len(g.addrsList)
 	switch {
 	case n == 0:
-		return nil, errors.New("no available name")
+		return nil, noAvailableAddrError
 	case n == 1:
 		return g.addrsList[0], nil
 	}
 
-	return g.addrsList[rand.Intn(n)], nil
+	return g.addrsList[atomic.AddUint32(&g.index, uint32(1))%uint32(n)], nil
 }

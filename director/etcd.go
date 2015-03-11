@@ -18,6 +18,11 @@ const (
 	servicesKind = "services"
 )
 
+var (
+	undefinedDomainError  = errors.New("domain not defined")
+	undefinedServiceError = errors.New("service not defined")
+)
+
 type etcdDirector struct {
 	client *etcd.Client
 
@@ -227,7 +232,7 @@ func (b *etcdDirector) Pick(hostname, path string) (*net.TCPAddr, error) {
 
 	domain := b.domains[hostname]
 	if domain == nil {
-		return nil, errors.New(fmt.Sprintf("domain, %s, not defined", hostname))
+		return nil, undefinedDomainError
 	}
 
 	serviceName, err := domain.pick(strings.TrimPrefix(path, "/"))
@@ -237,7 +242,7 @@ func (b *etcdDirector) Pick(hostname, path string) (*net.TCPAddr, error) {
 
 	service := b.services[serviceName]
 	if service == nil {
-		return nil, errors.New(fmt.Sprintf("service, %s, not defined", serviceName))
+		return nil, undefinedServiceError
 	}
 
 	return service.pick()
