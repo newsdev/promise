@@ -27,6 +27,11 @@ func newDomain() *domain {
 // setPrefix adds a prefix/service pair to the domain.
 func (d *domain) setPrefix(prefix, service string) {
 
+	// Check for dot as a prefix.
+	if prefix == "." {
+		prefix = ""
+	}
+
 	// We only want to add this value to the list if we haven't seen it before.
 	if _, ok := d.prefixes[prefix]; !ok {
 

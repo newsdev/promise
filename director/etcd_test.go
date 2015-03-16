@@ -1,15 +1,29 @@
 package director
 
-// import (
-// 	"testing"
-// )
+import (
+	"net"
+	"testing"
+)
 
-// func TestEtcdDirector(t *testing.T) {
+func BenchmarkEtcdDirectorPickSingleMatch(b *testing.B) {
 
-// 	b := NewEtcdDirector([]string{"http://127.0.0.1:4001"})
+	e := NewEtcdDirector([]string{})
 
-// 	err := b.Wait()
+	e.domains["localhost"] = newDomain()
+	e.domains["localhost"].setPrefix("/", "service")
+	e.services["service"] = newService()
 
-// 	t.Error(err)
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:4001")
+	if err != nil {
+		b.Fatal(err)
+	}
 
-// }
+	e.services["service"].setAddr("1", addr)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		e.Pick("localhost", "/")
+	}
+
+}

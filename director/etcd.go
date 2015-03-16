@@ -34,7 +34,9 @@ type etcdDirector struct {
 
 func NewEtcdDirector(machines []string) *etcdDirector {
 	return &etcdDirector{
-		client: etcd.NewClient(machines),
+		client:   etcd.NewClient(machines),
+		domains:  make(map[string]*domain),
+		services: make(map[string]*service),
 	}
 }
 
