@@ -15,12 +15,12 @@ type pair struct {
 
 type domain struct {
 	prefixesList []*pair
-	prefixes     map[string]string
+	prefixes     map[string]bool
 }
 
 func newDomain() *domain {
 	return &domain{
-		prefixes: make(map[string]string),
+		prefixes: make(map[string]bool),
 	}
 }
 
@@ -57,7 +57,7 @@ func (d *domain) setPrefix(prefix, service string) {
 
 	// Add the prefix/service pair to the map. This needs to be done even if the
 	// prefix was previously accounted for.
-	d.prefixes[prefix] = service
+	d.prefixes[prefix] = true
 }
 
 // removePrefix removes a prefix from the domain.
