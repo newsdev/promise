@@ -27,7 +27,7 @@ func TestDomain(t *testing.T) {
 
 	// Insure that the resulting prefixes list is in reverse order by prefix length.
 	for i := 0; i < len(d.prefixesList)-1; i++ {
-		if len(d.prefixesList[i].prefix) < len(d.prefixesList[i+1].prefix) {
+		if len(d.prefixesList[i]) < len(d.prefixesList[i+1]) {
 			t.Fatal("domain prefix length list is out of order")
 		}
 	}

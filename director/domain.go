@@ -9,28 +9,23 @@ var (
 	noMathingPrefixError = errors.New("no matching prefix")
 )
 
-type pair struct {
-	prefix, service string
+type route struct {
+	service string
 }
 
 type domain struct {
-	prefixesList []*pair
-	prefixes     map[string]bool
+	prefixesList []string
+	prefixes     map[string]*route
 }
 
 func newDomain() *domain {
 	return &domain{
-		prefixes: make(map[string]bool),
+		prefixes: make(map[string]*route),
 	}
 }
 
-// setPrefix adds a prefix/service pair to the domain.
+// setPrefix adds a prefix/service route to the domain.
 func (d *domain) setPrefix(prefix, service string) {
-
-	// Check for dot as a prefix.
-	if prefix == "." {
-		prefix = ""
-	}
 
 	// We only want to add this value to the list if we haven't seen it before.
 	if _, ok := d.prefixes[prefix]; !ok {
@@ -38,26 +33,28 @@ func (d *domain) setPrefix(prefix, service string) {
 		// Save a temporary reference to the list and create a new list that has
 		// room for another element.
 		tmpPathPrefixesList := d.prefixesList
-		d.prefixesList = make([]*pair, len(d.prefixesList)+1)
+		d.prefixesList = make([]string, len(d.prefixesList)+1)
 
 		// Find the correct index for the prefix, copying all values up to that point.
 		i := 0
-		for ; i < len(tmpPathPrefixesList) && len(tmpPathPrefixesList[i].prefix) > len(prefix); i++ {
+		for ; i < len(tmpPathPrefixesList) && len(tmpPathPrefixesList[i]) > len(prefix); i++ {
 			d.prefixesList[i] = tmpPathPrefixesList[i]
 		}
 
 		// Set the prefix.
-		d.prefixesList[i] = &pair{prefix, service}
+		d.prefixesList[i] = prefix
 
 		// Copy the remaining values from the old list.
 		for ; i < len(tmpPathPrefixesList); i++ {
 			d.prefixesList[i+1] = tmpPathPrefixesList[i]
 		}
+
+		d.prefixes[prefix] = &route{}
 	}
 
-	// Add the prefix/service pair to the map. This needs to be done even if the
+	// Add the prefix/service route to the map. This needs to be done even if the
 	// prefix was previously accounted for.
-	d.prefixes[prefix] = true
+	d.prefixes[prefix].service = service
 }
 
 // removePrefix removes a prefix from the domain.
@@ -68,11 +65,11 @@ func (d *domain) removePrefix(prefix string) {
 
 		// Save a temporary reference to the list and create a new list.
 		tmpPathPrefixList := d.prefixesList
-		d.prefixesList = make([]*pair, len(d.prefixesList)-1)
+		d.prefixesList = make([]string, len(d.prefixesList)-1)
 
 		// Find the index of the prefix we want to remove.
 		i := 0
-		for ; tmpPathPrefixList[i].prefix != prefix; i++ {
+		for ; tmpPathPrefixList[i] != prefix; i++ {
 			d.prefixesList[i] = tmpPathPrefixList[i]
 		}
 
@@ -91,8 +88,8 @@ func (d *domain) pick(path string) (string, error) {
 	// The list of path prefixes is in reverse order by string length. We want
 	// to return the first (most specific) match we come accross.
 	for _, prefix := range d.prefixesList {
-		if strings.HasPrefix(path, prefix.prefix) {
-			return prefix.service, nil
+		if strings.HasPrefix(path, prefix) {
+			return d.prefixes[prefix].service, nil
 		}
 	}
 
