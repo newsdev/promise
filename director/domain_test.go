@@ -22,14 +22,7 @@ var (
 func TestDomain(t *testing.T) {
 	d := newDomain()
 	for _, group := range testGroups {
-		d.setPrefix(group.prefix, group.service)
-	}
-
-	// Insure that the resulting prefixes list is in reverse order by prefix length.
-	for i := 0; i < len(d.prefixesList)-1; i++ {
-		if len(d.prefixesList[i]) < len(d.prefixesList[i+1]) {
-			t.Fatal("domain prefix length list is out of order")
-		}
+		d.setServicePrefix(group.prefix, group.service)
 	}
 
 	for _, group := range testGroups {
@@ -57,7 +50,7 @@ func BenchmarkDomainPickEmpty(b *testing.B) {
 
 func BenchmarkDomainPickSingleMatch(b *testing.B) {
 	d := newDomain()
-	d.setPrefix("/", "service")
+	d.setServicePrefix("/", "service")
 
 	b.ResetTimer()
 
@@ -68,7 +61,7 @@ func BenchmarkDomainPickSingleMatch(b *testing.B) {
 
 func BenchmarkDomainPickSingleNoMatch(b *testing.B) {
 	d := newDomain()
-	d.setPrefix("/foo", "service")
+	d.setServicePrefix("/foo", "service")
 
 	b.ResetTimer()
 
@@ -80,7 +73,7 @@ func BenchmarkDomainPickSingleNoMatch(b *testing.B) {
 func BenchmarkDomainMultipleMatch(b *testing.B) {
 	d := newDomain()
 	for _, group := range testGroups {
-		d.setPrefix(group.prefix, group.service)
+		d.setServicePrefix(group.prefix, group.service)
 	}
 
 	pick := testGroups[len(testGroups)/2].value
@@ -95,7 +88,7 @@ func BenchmarkDomainMultipleMatch(b *testing.B) {
 func BenchmarkDomainMultipleNoMatch(b *testing.B) {
 	d := newDomain()
 	for _, group := range testGroups {
-		d.setPrefix(group.prefix, group.service)
+		d.setServicePrefix(group.prefix, group.service)
 	}
 
 	b.ResetTimer()
@@ -108,7 +101,7 @@ func BenchmarkDomainMultipleNoMatch(b *testing.B) {
 func BenchmarkDomainMultipleNoMatchLong(b *testing.B) {
 	d := newDomain()
 	for _, group := range testGroups {
-		d.setPrefix(group.prefix, group.service)
+		d.setServicePrefix(group.prefix, group.service)
 	}
 
 	pick := "a" + testGroups[len(testGroups)-1].value

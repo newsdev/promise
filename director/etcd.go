@@ -2,7 +2,6 @@ package director
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -21,7 +20,38 @@ const (
 var (
 	undefinedDomainError  = errors.New("domain not defined")
 	undefinedServiceError = errors.New("service not defined")
+	nodeComponentsError   = errors.New("node has the wrong number of components")
 )
+
+type etcdParsedNode struct {
+	kind, name, detail, value string
+}
+
+func newParsedNode(node *etcd.Node) (*etcdParsedNode, error) {
+
+	// Parse the key.
+	key := strings.TrimPrefix(node.Key, etcdRootKey)
+	keyComponents := strings.SplitN(key, "/", 3)
+	if len(keyComponents) != 3 {
+		return nil, nodeComponentsError
+	}
+
+	return &etcdParsedNode{
+		kind:   keyComponents[0],
+		name:   keyComponents[1],
+		detail: keyComponents[2],
+		value:  node.Value,
+	}, nil
+}
+
+func (e *etcdParsedNode) fields() log.Fields {
+	return log.Fields{
+		"kind":   e.kind,
+		"name":   e.name,
+		"detail": e.detail,
+		"value":  e.value,
+	}
+}
 
 type etcdDirector struct {
 	client *etcd.Client
@@ -68,80 +98,111 @@ func (b *etcdDirector) getService(name string) *service {
 	return b.services[name]
 }
 
-func (b *etcdDirector) nodeAction(action string, node *etcd.Node) {
+func (b *etcdDirector) processDomainService(dn, prefix, service string, add bool) {
+
+	// Get the domain and set a map of fields for logging.
+	d := b.getDomain(dn)
+	fields := log.Fields{
+		"dn":      dn,
+		"prefix":  prefix,
+		"service": service,
+	}
+
+	// Check whether or not this action is additive.
+	if add {
+		d.setServicePrefix(prefix, service)
+		log.WithFields(fields).Info("+ domain service prefix")
+	} else {
+		d.removeServicePrefix(prefix)
+		log.WithFields(fields).Info("- domain service prefix")
+	}
+}
+
+func (b *etcdDirector) processDomainNode(e *etcdParsedNode, add bool) {
+
+	// Parse the detail into components and set the command.
+	detailComponents := strings.Split(e.detail, "/")
+	command := detailComponents[len(detailComponents)-1]
+
+	// Determine the prefix from the remaining components.
+	var prefix string
+	if len(detailComponents) > 1 {
+		prefix = strings.Join(detailComponents[:len(detailComponents)-2], "/")
+	}
+
+	// Switch on the command.
+	switch command {
+	case ".service":
+		b.processDomainService(e.name, prefix, e.value, add)
+	default:
+		log.WithFields(e.fields()).WithField("command", command).Error("unknown command")
+	}
+}
+
+func (b *etcdDirector) processServiceAddr(sn, name string, addr *net.TCPAddr, add bool) {
+
+	// Get the domain and set a map of fields for logging.
+	s := b.getService(sn)
+	fields := log.Fields{
+		"sn":   sn,
+		"name": name,
+		"addr": addr.String(),
+	}
+
+	// Check whether or not this action is additive.
+	if add {
+		s.setAddr(name, addr)
+		log.WithFields(fields).Info("+ service addr")
+	} else {
+		s.removeAddr(name)
+		log.WithFields(fields).Info("- service addr")
+	}
+}
+
+func (b *etcdDirector) processServiceNode(e *etcdParsedNode, add bool) {
+
+	// Parse the address.
+	addr, err := net.ResolveTCPAddr("tcp", e.value)
+	if err != nil {
+		log.WithFields(e.fields()).Error(err)
+		return
+	}
+
+	// Check for a valid port.
+	if addr.Port <= 0 {
+		log.WithFields(e.fields()).WithField("port", addr.Port).Error("invalid port")
+		return
+	}
+
+	// Process the service addr.
+	b.processServiceAddr(e.name, e.detail, addr, add)
+}
+
+func (b *etcdDirector) nodeAction(node *etcd.Node, add bool) {
 
 	// Check if the node is a directory.
 	if node.Dir {
 
 		// Recurse to find leaves.
 		for _, next := range node.Nodes {
-			b.nodeAction(action, next)
+			b.nodeAction(next, add)
 		}
 	} else {
 
-		// Parse the components, returning if there are the wrong number.
-		key := strings.TrimPrefix(node.Key, etcdRootKey)
-		keyComponents := strings.SplitN(key, "/", 3)
-		if len(keyComponents) != 3 {
-			log.Error(fmt.Sprintf("node key, %s, has the wrong number of components", key))
-			return
-		}
+		parsedNode, err := newParsedNode(node)
+		if err != nil {
+			log.Error(err)
+		} else {
 
-		// Map the key components and set the field object.
-		kind := keyComponents[0]
-		name := keyComponents[1]
-		detail := keyComponents[2]
-		value := node.Value
-		fields := log.Fields{
-			"kind":   kind,
-			"name":   name,
-			"detail": detail,
-			"value":  value,
-		}
-
-		// Switch on the first value, kind.
-		switch kind {
-
-		// Process a domain-related action.
-		case domainsKind:
-			d := b.getDomain(name)
-			switch action {
-			case "get", "set":
-				d.setPrefix(detail, value)
-				log.WithFields(fields).Info("+ domain prefix")
-			case "delete", "expire":
-				d.removePrefix(detail)
-				log.WithFields(fields).Info("- domain prefix")
+			// Check what kind of node this is.
+			switch parsedNode.kind {
+			case domainsKind:
+				b.processDomainNode(parsedNode, add)
+			case servicesKind:
+				b.processServiceNode(parsedNode, add)
+			default:
+				log.WithFields(parsedNode.fields()).Error("unknown kind")
 			}
-
-		// Process a service-related action.
-		case servicesKind:
-			s := b.getService(name)
-			switch action {
-			case "get", "set":
-
-				// Parse the address.
-				addr, err := net.ResolveTCPAddr("tcp", value)
-				if err != nil {
-					log.WithFields(fields).Error(err)
-					return
-				}
-
-				if addr.Port <= 0 {
-					log.WithFields(fields).Error("invalid port")
-					return
-				}
-
-				s.setAddr(detail, addr)
-				log.WithFields(fields).Info("+ service addr")
-
-			case "delete", "expire":
-				s.removeAddr(detail)
-				log.WithFields(fields).Info("- service addr")
-			}
-
-		default:
-			log.WithFields(fields).Error("unknown kind")
 		}
 	}
 }
@@ -162,7 +223,7 @@ func (b *etcdDirector) reset() (uint64, error) {
 	b.services = make(map[string]*service)
 
 	// Process the node action while holding the lock.
-	b.nodeAction(r.Action, r.Node)
+	b.nodeAction(r.Node, true)
 
 	// Release the lock.
 	b.lock.Unlock()
@@ -190,7 +251,18 @@ func (b *etcdDirector) watch(index uint64) error {
 
 		// Process the node action while holding the lock.
 		b.lock.Lock()
-		b.nodeAction(r.Action, r.Node)
+
+		// Determine if this action is additive or not.
+		switch r.Action {
+		case "get", "set":
+			b.nodeAction(r.Node, true)
+		case "delete", "expire":
+			b.nodeAction(r.Node, false)
+		default:
+			log.WithField("action", r.Action).Info("unknown action")
+		}
+
+		// Release the lock.
 		b.lock.Unlock()
 	}
 }

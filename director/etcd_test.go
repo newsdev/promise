@@ -10,7 +10,7 @@ func BenchmarkEtcdDirectorPickSingleMatch(b *testing.B) {
 	e := NewEtcdDirector([]string{})
 
 	e.domains["localhost"] = newDomain()
-	e.domains["localhost"].setPrefix("/", "service")
+	e.domains["localhost"].setServicePrefix("/", "service")
 	e.services["service"] = newService()
 
 	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:4001")
