@@ -6,7 +6,7 @@ type domain struct {
 
 func newDomain() *domain {
 	return &domain{
-		services: NewMatcher(),
+		services: newMatcher(),
 	}
 }
 
