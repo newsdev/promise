@@ -52,12 +52,6 @@ func main() {
 		},
 	}
 
-	// Add a status check route. In the future this should possibly be optional.
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		fmt.Fprint(w, "ok")
-	})
-
 	// Every other request should hit the reverse proxy.
 	http.Handle("/", reverseProxy)
 
