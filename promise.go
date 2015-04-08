@@ -2,7 +2,6 @@ package main // import "github.com/newsdev/promise"
 
 import (
 	"flag"
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"strings"

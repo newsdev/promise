@@ -1,8 +1,8 @@
 package logrus_airbrake
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/tobi/airbrake-go"
+	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
+	"github.com/newsdev/promise/vendor/src/github.com/tobi/airbrake-go"
 )
 
 // AirbrakeHook to send exceptions to an exception-tracking service compatible
