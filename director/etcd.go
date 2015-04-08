@@ -169,7 +169,7 @@ func (b *etcdDirector) processServiceNode(e *etcdParsedNode, add bool) {
 	}
 
 	// Check for a valid port.
-	if addr.Port <= 0 {
+	if add && addr.Port <= 0 {
 		log.WithFields(e.fields()).WithField("port", addr.Port).Error("invalid port")
 		return
 	}
