@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/Sirupsen/logrus/hooks/airbrake"
-	"github.com/tobi/airbrake-go"
+	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
+	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus/hooks/airbrake"
+	"github.com/newsdev/promise/vendor/src/github.com/tobi/airbrake-go"
 )
 
 var log = logrus.New()

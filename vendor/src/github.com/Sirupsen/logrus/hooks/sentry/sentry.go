@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/getsentry/raven-go"
+	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
+	"github.com/newsdev/promise/vendor/src/github.com/getsentry/raven-go"
 )
 
 var (

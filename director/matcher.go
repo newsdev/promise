@@ -14,7 +14,7 @@ type matcher struct {
 	prefixes     map[string]string
 }
 
-func NewMatcher() *matcher {
+func newMatcher() *matcher {
 	return &matcher{
 		prefixes: make(map[string]string),
 	}

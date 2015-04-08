@@ -2,7 +2,6 @@ package main // import "github.com/newsdev/promise"
 
 import (
 	"flag"
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -51,12 +50,6 @@ func main() {
 			req.URL.Host = addr.String()
 		},
 	}
-
-	// Add a status check route. In the future this should possibly be optional.
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		fmt.Fprint(w, "ok")
-	})
 
 	// Every other request should hit the reverse proxy.
 	http.Handle("/", reverseProxy)
