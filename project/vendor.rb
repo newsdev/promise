@@ -45,8 +45,6 @@ def get_package(type, name, ref)
 	when :hg
 		run "hg clone --quiet --updaterev #{ref} https://#{name} #{path}"
 	end
-
-	run "rm -rf #{File.join(path, ".#{type}")}"
 end
 
 FileUtils.rm_rf $src
@@ -57,6 +55,10 @@ end
 
 run "GOPATH=#{$vendor} go get ./vendor/src/..."
 FileUtils.rm_rf File.join($root, 'vendor/pkg')
+
+Dir.glob(File.join($root, 'vendor/src/**/.*')).each do |path|
+	FileUtils.rm_rf path
+end
 
 Dir.glob(File.join($root, 'vendor/src/**/*.go')).each do |path|
 
