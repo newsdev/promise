@@ -27,6 +27,8 @@ def vendored_package_name(package)
 	File.join($package_name, 'vendor/src', package)
 end
 
+# vendored_package_path the absolute path to the vendored version of the given
+# package.
 def vendored_package_path(package)
 	File.join($root, 'vendor/src', package)
 end
@@ -44,6 +46,7 @@ def get_package(type, name, ref)
 		run "hg clone --quiet --updaterev #{ref} https://#{name} #{path}"
 	end
 
+	# Remove the SCM directory.
 	FileUtils.rm_rf File.join(path, ".#{type}")
 end
 
@@ -54,6 +57,9 @@ FileUtils.rm_rf $vendor
 get_package :git, 'github.com/coreos/go-etcd', '6aa2da5a7a905609c93036b9307185a04a5a84a5'
 get_package :git, 'github.com/Sirupsen/logrus', 'c0f7e35ed2e48f188c37581b4b743cf7383f85c6'
 
+# Correct the import paths in the vendored packages. We do this *after*
+# fetching the packages to handle the case where one vendored package
+# references another.
 Dir.glob(File.join($root, 'vendor/src/**/*.go')).each do |path|
 
 	# Check to see if the matched file is a test. We don't need to run the tests
