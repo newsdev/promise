@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
 	"github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus/hooks/airbrake"
-	"github.com/newsdev/promise/vendor/src/github.com/tobi/airbrake-go"
+	"github.com/tobi/airbrake-go"
 )
 
 var log = logrus.New()
