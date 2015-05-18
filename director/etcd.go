@@ -2,17 +2,17 @@ package director
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	log "github.com/newsdev/promise/vendor/src/github.com/Sirupsen/logrus"
-	"github.com/newsdev/promise/vendor/src/github.com/coreos/go-etcd/etcd"
+	log "github.com/Sirupsen/logrus"
+	"github.com/coreos/go-etcd/etcd"
 )
 
 const (
-	etcdRootKey  = "/promise/"
 	domainsKind  = "domains"
 	servicesKind = "services"
 )
@@ -27,10 +27,10 @@ type etcdParsedNode struct {
 	kind, name, detail, value string
 }
 
-func newParsedNode(node *etcd.Node) (*etcdParsedNode, error) {
+func newParsedNode(etcdRootKey string, node *etcd.Node) (*etcdParsedNode, error) {
 
 	// Parse the key.
-	key := strings.TrimPrefix(node.Key, etcdRootKey)
+	key := strings.TrimPrefix(node.Key, fmt.Sprintf("/%s/", etcdRootKey))
 	keyComponents := strings.SplitN(key, "/", 3)
 	if len(keyComponents) != 3 {
 		return nil, nodeComponentsError
@@ -54,7 +54,8 @@ func (e *etcdParsedNode) fields() log.Fields {
 }
 
 type etcdDirector struct {
-	client *etcd.Client
+	client      *etcd.Client
+	etcdRootKey string
 
 	// Access to the routing information is controlled by a read/write mutext.
 	lock     sync.RWMutex
@@ -62,11 +63,12 @@ type etcdDirector struct {
 	services map[string]*service
 }
 
-func NewEtcdDirector(machines []string) *etcdDirector {
+func NewEtcdDirector(etcdRootKey string, machines []string) *etcdDirector {
 	return &etcdDirector{
-		client:   etcd.NewClient(machines),
-		domains:  make(map[string]*domain),
-		services: make(map[string]*service),
+		etcdRootKey: etcdRootKey,
+		client:      etcd.NewClient(machines),
+		domains:     make(map[string]*domain),
+		services:    make(map[string]*service),
 	}
 }
 
@@ -189,7 +191,7 @@ func (b *etcdDirector) nodeAction(node *etcd.Node, add bool) {
 		}
 	} else {
 
-		parsedNode, err := newParsedNode(node)
+		parsedNode, err := newParsedNode(b.etcdRootKey, node)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -210,7 +212,7 @@ func (b *etcdDirector) nodeAction(node *etcd.Node, add bool) {
 func (b *etcdDirector) reset() (uint64, error) {
 
 	// Get(key string, sort, recursive bool)
-	r, err := b.client.Get(etcdRootKey, true, true)
+	r, err := b.client.Get(b.etcdRootKey, true, true)
 	if err != nil {
 		return 0, err
 	}
@@ -241,7 +243,7 @@ func (b *etcdDirector) watch(index uint64) error {
 		// Issue the watch command. This will block until a new update is
 		// available or an error occurs.
 		log.WithFields(log.Fields{"wait_index": waitIndex}).Info("watch")
-		r, err := b.client.Watch(etcdRootKey, waitIndex, true, nil, nil)
+		r, err := b.client.Watch(b.etcdRootKey, waitIndex, true, nil, nil)
 		if err != nil {
 			return err
 		}
