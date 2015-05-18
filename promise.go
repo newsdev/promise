@@ -19,11 +19,8 @@ var (
 )
 
 func init() {
-
 	prefixValidator = regexp.MustCompile(`^\w+(\/\w+)*$`)
-
-	flag.StringVar(&listenerPairs, "listeners", "/promise:80", "etcd prefix/address pairs to setup listners")
-
+	flag.StringVar(&listenerPairs, "listeners", "promise:80", "etcd prefix/address pairs to setup listners")
 	flag.StringVar(&etcdPeers, "C", "http://127.0.0.1:4001", "a comma-delimited list of machine addresses in the etcd cluster")
 	flag.BoolVar(&enableCompression, "z", false, "enable transport compresssion")
 }
