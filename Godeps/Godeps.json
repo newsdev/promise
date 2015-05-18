@@ -1,0 +1,26 @@
+{
+	"ImportPath": "github.com/newsdev/promise",
+	"GoVersion": "go1.4.2",
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.6.4",
+			"Rev": "58f778a886b1e483dccc3b61085ccf347bf1a37e"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
+			"Comment": "v2.0.3-29-gd57e07d",
+			"Rev": "d57e07dcde6bb36eecf19a5e57e9850c9a237b2f"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.0.3-29-gd57e07d",
+			"Rev": "d57e07dcde6bb36eecf19a5e57e9850c9a237b2f"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-etcd/etcd",
+			"Comment": "v0.4.6-5-g1c8e802",
+			"Rev": "1c8e802c1b17a9e684d4a54439708243b25987bd"
+		}
+	]
+}

@@ -7,7 +7,7 @@ import (
 
 func BenchmarkEtcdDirectorPickSingleMatch(b *testing.B) {
 
-	e := NewEtcdDirector([]string{})
+	e := NewEtcdDirector("/promise", []string{})
 
 	e.domains["localhost"] = newDomain()
 	e.domains["localhost"].setServicePrefix("/", "service")

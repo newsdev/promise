@@ -1,4 +1,6 @@
-FROM golang:1.4.2-onbuild
-ENTRYPOINT ["go-wrapper", "run"]
-CMD ["-a", ":80"]
-EXPOSE 80
+FROM golang:1.4.2
+RUN go get github.com/tools/godep
+COPY . /go/src/github.com/newsdev/promise
+WORKDIR /go/src/github.com/newsdev/promise
+RUN godep go install .
+ENTRYPOINT ["promise"]
